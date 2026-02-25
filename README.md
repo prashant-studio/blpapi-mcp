@@ -16,7 +16,12 @@ uv add git+https://github.com/djsamseng/blpapi-mcp
 ```bash
 uv run blpapi-mcp --sse --host 127.0.0.1 --port 8000
 ```
-When run with `--sse` (or `--host`/`--port`), the server uses the **Streamable HTTP** transport at `/mcp`: both **GET** (SSE stream) and **POST** (JSON-RPC) are supported on the same URL, so clients that prefer streamable HTTP (e.g. Cursor) can connect without 405 or content-type errors.
+When run with `--sse` (or `--host`/`--port`), the server uses **Streamable HTTP** with two paths:
+
+- **`/sse`** — SSE stream (GET). Use this URL for the event stream in clients that expect a dedicated SSE endpoint (e.g. Claude).
+- **`/mcp`** — MCP endpoint: GET (SSE) and POST (JSON-RPC) on the same URL. Use this in Cursor or other clients that use one URL for both.
+
+So you can connect with `http://127.0.0.1:8000/sse` for SSE only, or `http://127.0.0.1:8000/mcp` for the combined endpoint.
 
 ## Using blpapi-cmp from [Cursor](https://docs.cursor.com/context/model-context-protocol)
 - For project only: create .cursor/mcp.json in your project directory

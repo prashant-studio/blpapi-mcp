@@ -1,5 +1,3 @@
-
-
 import json
 import typing
 
@@ -9,20 +7,56 @@ import pandas as pd
 from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.fastmcp.utilities.logging import get_logger
 from mcp.server.transport_security import TransportSecuritySettings
+from starlette.requests import Request
+from starlette.routing import Route
 from xbbg import blp
 
 from . import types
 
+SSE_PATH = "/sse"
+MCP_PATH = "/mcp"
+
+
+def _patch_sse_accept_header():
+    """Allow SSE GET connections from clients that don't send Accept: text/event-stream (e.g. Claude).
+    Patches MCP transport so we inject the header instead of returning 406."""
+    from mcp.server import streamable_http
+
+    transport_class = streamable_http.StreamableHTTPServerTransport
+    _original_handle_get = transport_class._handle_get_request
+
+    async def _handle_get_request_no_accept_check(self, request: Request, send):
+        scope = request.scope
+        headers = list(scope.get("headers", []))
+        headers = [(k, v) for k, v in headers if k.lower() != b"accept"]
+        headers.append((b"accept", b"text/event-stream"))
+        new_scope = {**scope, "headers": headers}
+        new_request = Request(new_scope, request.receive)
+        await _original_handle_get(self, new_request, send)
+
+    transport_class._handle_get_request = _handle_get_request_no_accept_check
+
+
+def _add_sse_route(app, mcp_path: str, sse_path: str):
+    """Add a separate /sse route that uses the same handler as the MCP path."""
+    for i, route in enumerate(app.router.routes):
+        path = getattr(route, "path", None)
+        if path == mcp_path:
+            app.router.routes.insert(i, Route(sse_path, endpoint=route.endpoint))
+            return
+    raise RuntimeError(f"Could not find route for {mcp_path} to clone for {sse_path}")
 
 
 def serve(args: types.StartupArgs):
-  # Streamable HTTP at /mcp so clients can use the same URL for GET (SSE) and POST (JSON-RPC)
+  _patch_sse_accept_header()
+
+  # Streamable HTTP: /sse for SSE (GET), /mcp for MCP (GET+POST+DELETE) on the same handler
   # Disable strict Host validation so requests via Cloudflare tunnel (Host: *.trycloudflare.com) are accepted
   mcp = FastMCP(
     "blpapi-mcp",
     host=args.host,
     port=args.port,
-    streamable_http_path="/mcp",
+    streamable_http_path=MCP_PATH,
     json_response=True,
     transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
   )
@@ -110,5 +144,25 @@ def serve(args: types.StartupArgs):
   async def turnover(tickers:typing.List[str], flds:str="Turnover", start_date:typing.Union[None,str]=None, end_date:typing.Union[None,str]=None, ccy:str="USD", factor:float=1e6) -> typing.Any:
     return blp.turnover(tickers=tickers, flds=flds, start_date=start_date, end_date=end_date, ccy=ccy, factor=factor)
 
+  if args.transport.value == "streamable-http":
+    import anyio
+    import uvicorn
 
-  mcp.run(transport=args.transport.value)
+    app = mcp.streamable_http_app()
+    _add_sse_route(app, MCP_PATH, SSE_PATH)
+    logger.info("SSE at %s, MCP at %s", SSE_PATH, MCP_PATH)
+
+    config = uvicorn.Config(
+      app,
+      host=args.host,
+      port=args.port,
+      log_level=mcp.settings.log_level.lower(),
+    )
+
+    async def _serve():
+      server = uvicorn.Server(config)
+      await server.serve()
+
+    anyio.run(_serve)
+  else:
+    mcp.run(transport=args.transport.value)
