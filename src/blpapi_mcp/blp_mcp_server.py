@@ -8,6 +8,7 @@ import blpapi.version
 import pandas as pd
 from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.fastmcp.utilities.logging import get_logger
+from mcp.server.transport_security import TransportSecuritySettings
 from xbbg import blp
 
 from . import types
@@ -16,12 +17,14 @@ from . import types
 
 def serve(args: types.StartupArgs):
   # Streamable HTTP at /mcp so clients can use the same URL for GET (SSE) and POST (JSON-RPC)
+  # Disable strict Host validation so requests via Cloudflare tunnel (Host: *.trycloudflare.com) are accepted
   mcp = FastMCP(
     "blpapi-mcp",
     host=args.host,
     port=args.port,
     streamable_http_path="/mcp",
     json_response=True,
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
   )
 
   logger = get_logger(__name__)
