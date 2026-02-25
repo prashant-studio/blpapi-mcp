@@ -35,7 +35,7 @@ def serve(args: types.StartupArgs):
     name="bdp",
     description="Get Bloomberg reference data"
   )
-  async def bdp(tickers:typing.List[str], flds:typing.List[str], kwargs:typing.Dict[str, typing.Any]) -> typing.Any:
+  async def bdp(tickers:typing.List[str], flds:typing.List[str], kwargs: types.BloombergKWArgs = None) -> typing.Any:
     return blp.bdp(tickers=tickers, flds=flds, kwargs=kwargs)
 
   @mcp.tool(
