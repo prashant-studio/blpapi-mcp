@@ -16,6 +16,7 @@ uv add git+https://github.com/djsamseng/blpapi-mcp
 ```bash
 uv run blpapi-mcp --sse --host 127.0.0.1 --port 8000
 ```
+When run with `--sse` (or `--host`/`--port`), the server uses the **Streamable HTTP** transport at `/mcp`: both **GET** (SSE stream) and **POST** (JSON-RPC) are supported on the same URL, so clients that prefer streamable HTTP (e.g. Cursor) can connect without 405 or content-type errors.
 
 ## Using blpapi-cmp from [Cursor](https://docs.cursor.com/context/model-context-protocol)
 - For project only: create .cursor/mcp.json in your project directory
@@ -25,7 +26,7 @@ uv run blpapi-mcp --sse --host 127.0.0.1 --port 8000
 {
   "mcpServers": {
     "server-name": {
-      "url": "http://127.0.0.1:8000/sse",
+      "url": "http://127.0.0.1:8000/mcp",
     }
   }
 }
@@ -34,7 +35,7 @@ uv run blpapi-mcp --sse --host 127.0.0.1 --port 8000
 ## Using blpapi-mcp from [Claude Code](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/tutorials#set-up-model-context-protocol-mcp)
 - Replace the url with the MCP server running from above
 ```bash
-claud mcp add --transport sse blpapi-mcp http://127.0.0.1:8000/sse
+claud mcp add --transport sse blpapi-mcp http://127.0.0.1:8000/mcp
 ```
 - [Remote hosts for Claude Desktop is still in development](https://modelcontextprotocol.io/quickstart/user#1-download-claude-for-desktop)
 

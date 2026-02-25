@@ -6,8 +6,9 @@ import typing
 
 
 class Transport(enum.Enum):
-  SSE="sse"
-  STDIO="stdio"
+  STDIO = "stdio"
+  SSE = "sse"
+  STREAMABLE_HTTP = "streamable-http"
 
 class StartupArgs:
   transport: Transport
